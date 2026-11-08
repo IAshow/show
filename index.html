@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Instrutor de Código</title>
 <style>
-:root{--bg:#f5f6f8;--card:#fff;--tx:#1b1f24;--mut:#5f6b7a;--bd:#dde2e8;--pri:#1f5fbf;--ok:#1d8a4b;--okbg:#e5f5ec;--ko:#c0352b;--kobg:#fbe9e7;--warn:#b26b00}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12151a;--card:#1b2028;--tx:#e8ecf1;--mut:#9aa6b4;--bd:#2c3440;--pri:#6ea4ff;--ok:#4cc483;--okbg:#16301f;--ko:#ff7a6e;--kobg:#3a1b18;--warn:#f0b04a}}
-:root[data-theme="dark"]{--bg:#12151a;--card:#1b2028;--tx:#e8ecf1;--mut:#9aa6b4;--bd:#2c3440;--pri:#6ea4ff;--ok:#4cc483;--okbg:#16301f;--ko:#ff7a6e;--kobg:#3a1b18;--warn:#f0b04a}
+:root{color-scheme:light;--bg:#f5f6f8;--card:#fff;--tx:#1b1f24;--mut:#5f6b7a;--bd:#dde2e8;--pri:#1f5fbf;--ok:#1d8a4b;--okbg:#e5f5ec;--ko:#c0352b;--kobg:#fbe9e7;--warn:#b26b00}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12151a;--card:#1b2028;--tx:#e8ecf1;--mut:#9aa6b4;--bd:#2c3440;--pri:#6ea4ff;--ok:#4cc483;--okbg:#16301f;--ko:#ff7a6e;--kobg:#3a1b18;--warn:#f0b04a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#12151a;--card:#1b2028;--tx:#e8ecf1;--mut:#9aa6b4;--bd:#2c3440;--pri:#6ea4ff;--ok:#4cc483;--okbg:#16301f;--ko:#ff7a6e;--kobg:#3a1b18;--warn:#f0b04a;color-scheme:dark}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-main{max-width:760px;margin:0 auto;padding:16px}
+main{max-width:760px;margin:0 auto;padding-block:16px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 h1{font-size:1.5rem;margin:.2em 0}h2{font-size:1.2rem;margin:1.2em 0 .5em}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px;margin:12px 0}
 .mut{color:var(--mut)}.small{font-size:.875rem}
@@ -97,7 +97,7 @@ function prep(qs){return qs.map(p=>{const order=shuffle(p.o.map((_,i)=>i));retur
 // ─────────── Ecrãs ───────────
 function header(){
  const dias=Math.ceil((new Date(S.examDate)-new Date(new Date().toISOString().slice(0,10)))/864e5);
- return `<div class="top"><div><h1>🚗 Instrutor de Código</h1><div class="mut small">Exame teórico categoria B · 30 perguntas · 30 min · máximo 3 erros</div></div>
+ return `<div class="top"><div><h1>Instrutor de Código</h1><div class="mut small">Exame teórico categoria B · 30 perguntas · 30 min · máximo 3 erros</div></div>
  <span class="pill">${dias>=0?`Faltam <b>${dias}</b> dias`:"Data do exame passou"}</span></div>
  <nav><button onclick="home()">Início</button><button onclick="startExam()">Simulação</button><button onclick="pickTheme()">Treino por tema</button><button onclick="reviewErr()">Revisão de erros (${weakQs().length})</button><button onclick="mistakes()">Erros frequentes</button><button onclick="plan()">Plano 3 semanas</button><button onclick="tips()">Estratégia</button></nav>`;
 }
@@ -120,7 +120,8 @@ function home(){
  <h2>Domínio por tema</h2>
  <div class="card"><table><tr><th>Tema</th><th>Acerto</th><th></th></tr>${rows}</table>
  <p class="mut small">Verde ≥ 90% · Laranja 75–89% · Vermelho &lt; 75%. Treina primeiro os vermelhos.</p>
- <button onclick="if(confirm('Apagar todo o progresso?')){S={stats:{},box:{},pend:{},miss:{},exams:[],plan:{},examDate:S.examDate};save();home()}">Repor progresso</button></div>`;
+ <button id="rst0" onclick="this.hidden=true;document.getElementById('rst1').hidden=false">Repor progresso</button>
+ <span id="rst1" hidden><b class="ko-t">Apagar todo o progresso?</b> <button onclick="S={stats:{},box:{},pend:{},miss:{},exams:[],plan:{},examDate:S.examDate};save();home()">Sim, apagar</button> <button onclick="home()">Cancelar</button></span></div>`;
 }
 
 // ── Simulação de exame ──
@@ -148,14 +149,15 @@ function renderExam(){
  <div class="bar" style="margin:10px 0"><i style="width:${n/30*100}%"></i></div>${qHtml(it,false)}
  <div class="top" style="margin-top:10px"><button onclick="EX.i=Math.max(0,EX.i-1);renderExam()" ${EX.i?"":"disabled"}>← Anterior</button>
  ${EX.i<29?`<button class="p" onclick="EX.i++;renderExam()">Seguinte →</button>`:`<button class="p" onclick="finishExam()">Entregar exame</button>`}</div>
+ ${EX.ask?`<div class="exp" style="border-color:var(--ko)"><b>Tens ${EX.ask} pergunta(s) sem resposta</b> — contam como erro.<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap"><button class="p" onclick="finishExam(false,true)">Entregar mesmo assim</button><button onclick="EX.ask=0;EX.i=EX.qs.findIndex(q=>q.ans==null);renderExam()">Ir para a primeira sem resposta</button></div></div>`:""}
  <div class="qnav">${EX.qs.map((q,k)=>`<button class="${q.ans!=null?"ans":""} ${k===EX.i?"cur":""}" onclick="EX.i=${k};renderExam()">${k+1}</button>`).join("")}</div>
  <p class="mut small">Tal como no exame real, só vês a correção no fim. Podes voltar atrás e rever.</p></div>`;
- app.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{it.ans=+b.dataset.oi;renderExam()});
+ app.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{it.ans=+b.dataset.oi;EX.ask=0;renderExam()});
 }
-function finishExam(timeout){
+function finishExam(timeout,force){
  if(EX.done)return;
  const sem=EX.qs.filter(q=>q.ans==null).length;
- if(!timeout&&sem&&!confirm(`Tens ${sem} pergunta(s) sem resposta (contam como erro). Entregar?`))return;
+ if(!timeout&&sem&&!force){EX.ask=sem;renderExam();return}
  EX.done=true;clearInterval(timer);
  EX.qs.forEach(q=>record(q.p,q.ans===q.p.c,q.ans));
  const err=EX.qs.filter(q=>q.ans!==q.p.c).length;

@@ -44,8 +44,11 @@ table{width:100%;border-collapse:collapse}td,th{padding:6px 4px;border-bottom:1p
 <script>
 // ─────────── Armazenamento (seguro) ───────────
 const KEY="instrutor-codigo-v1";
+const NEED=2; // acertos seguidos para sair da Revisão de erros
 function load(){try{return JSON.parse(localStorage.getItem(KEY))||{}}catch(e){return{}}}
-let S=Object.assign({stats:{},box:{},exams:[],plan:{},examDate:null},load());
+let S=Object.assign({stats:{},box:{},pend:{},miss:{},exams:[],plan:{},examDate:null},load());
+// migração: perguntas antigas marcadas como erradas passam a exigir 2 acertos seguidos
+Object.entries(S.box).forEach(([id,b])=>{if(b===-1&&S.pend[id]==null)S.pend[id]=NEED});
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 if(!S.examDate){const d=new Date();d.setDate(d.getDate()+21);S.examDate=d.toISOString().slice(0,10);save()}
 
@@ -69,18 +72,23 @@ const SIG={
 };
 
 // ─────────── Estatísticas e repetição espaçada (caixas de Leitner) ───────────
-function record(p,ok){
+function record(p,ok,oi){
  const st=S.stats[p.t]||(S.stats[p.t]={a:0,c:0});st.a++;if(ok)st.c++;
- const b=S.box[p.id]??0;S.box[p.id]=ok?Math.min(b+1,4):-1; // -1 = errada recentemente
+ const b=S.box[p.id]??0;S.box[p.id]=ok?Math.min(Math.max(b,0)+1,4):-1;
+ if(ok){if(S.pend[p.id]!=null){S.pend[p.id]--;if(S.pend[p.id]<=0)delete S.pend[p.id]}}
+ else{S.pend[p.id]=NEED;const m=S.miss[p.id]||(S.miss[p.id]={n:0,o:{}});m.n++;if(oi!=null)m.o[oi]=(m.o[oi]||0)+1}
  save();
 }
-function weakQs(){return PERGUNTAS.filter(p=>S.box[p.id]===-1)}
+function weakQs(){return PERGUNTAS.filter(p=>S.pend[p.id]!=null)}
+// explicação de porque é que a opção oi (errada) está errada
+function whyWrong(p,oi){return oi==null||oi===p.c?"":p.w[oi<p.c?oi:oi-1]}
 function pickExam(n=30){
  // Distribui por todos os temas e privilegia as perguntas em que mais falhas
  const byT={};PERGUNTAS.forEach(p=>(byT[p.t]=byT[p.t]||[]).push(p));
  const out=[];const temas=shuffle(Object.keys(byT));
  let k=0;while(out.length<n){const arr=byT[temas[k%temas.length]];const pool=arr.filter(p=>!out.includes(p));
-  if(pool.length){pool.sort((a,b)=>(S.box[a.id]??0)-(S.box[b.id]??0)+Math.random()*2-1);out.push(pool[0])}k++;
+  const pr=q=>(S.pend[q.id]!=null?-3:0)+(S.box[q.id]??0)-Math.min((S.miss[q.id]?.n||0),3);
+  if(pool.length){pool.sort((a,b)=>pr(a)-pr(b)+Math.random()*2-1);out.push(pool[0])}k++;
   if(k>5000)break}
  return shuffle(out);
 }
@@ -91,7 +99,7 @@ function header(){
  const dias=Math.ceil((new Date(S.examDate)-new Date(new Date().toISOString().slice(0,10)))/864e5);
  return `<div class="top"><div><h1>🚗 Instrutor de Código</h1><div class="mut small">Exame teórico categoria B · 30 perguntas · 30 min · máximo 3 erros</div></div>
  <span class="pill">${dias>=0?`Faltam <b>${dias}</b> dias`:"Data do exame passou"}</span></div>
- <nav><button onclick="home()">Início</button><button onclick="startExam()">Simulação</button><button onclick="pickTheme()">Treino por tema</button><button onclick="reviewErr()">Revisão de erros (${weakQs().length})</button><button onclick="plan()">Plano 3 semanas</button><button onclick="tips()">Estratégia</button></nav>`;
+ <nav><button onclick="home()">Início</button><button onclick="startExam()">Simulação</button><button onclick="pickTheme()">Treino por tema</button><button onclick="reviewErr()">Revisão de erros (${weakQs().length})</button><button onclick="mistakes()">Erros frequentes</button><button onclick="plan()">Plano 3 semanas</button><button onclick="tips()">Estratégia</button></nav>`;
 }
 function home(){
  const tot=Object.values(S.stats).reduce((a,s)=>({a:a.a+s.a,c:a.c+s.c}),{a:0,c:0});
@@ -108,10 +116,11 @@ function home(){
  <div class="card"><b>Data do exame:</b> <input type="date" value="${S.examDate}" onchange="S.examDate=this.value;save();home()">
   <p class="mut small">Instrutor: "Não te contentes com 3 erros nos treinos. Se no simulador fazes 0–2 erros com regularidade, no dia do exame os nervos ainda te deixam margem."</p>
   <button class="p" onclick="startExam()">Começar simulação de exame</button></div>
+ ${topMiss(3).length?`<div class="card"><b>⚠ Os teus erros mais repetidos</b><ol>${topMiss(3).map(([p,m])=>`<li>${esc(p.q)} <span class="mut small">(${m.n}×)</span></li>`).join("")}</ol><button onclick="mistakes()">Ver análise completa</button></div>`:""}
  <h2>Domínio por tema</h2>
  <div class="card"><table><tr><th>Tema</th><th>Acerto</th><th></th></tr>${rows}</table>
  <p class="mut small">Verde ≥ 90% · Laranja 75–89% · Vermelho &lt; 75%. Treina primeiro os vermelhos.</p>
- <button onclick="if(confirm('Apagar todo o progresso?')){S={stats:{},box:{},exams:[],plan:{},examDate:S.examDate};save();home()}">Repor progresso</button></div>`;
+ <button onclick="if(confirm('Apagar todo o progresso?')){S={stats:{},box:{},pend:{},miss:{},exams:[],plan:{},examDate:S.examDate};save();home()}">Repor progresso</button></div>`;
 }
 
 // ── Simulação de exame ──
@@ -128,7 +137,10 @@ function qHtml(it,reveal){
  return `${p.s?`<div class="sign">${SIG[p.s]||""}</div>`:""}<p><b>${esc(p.q)}</b></p>
  ${it.order.map((oi,k)=>{let c="opt";if(it.ans===oi)c+=" sel";if(reveal){if(oi===p.c)c+=" ok";else if(it.ans===oi)c+=" ko"}
   return `<button class="${c}" data-oi="${oi}" ${reveal?"disabled":""}>${"ABCD"[k]}. ${esc(p.o[oi])}</button>`}).join("")}
- ${reveal?`<div class="exp"><b>${it.ans===p.c?"✔ Certo":"✘ Errado"}</b> — ${esc(p.e)}</div>`:""}`;
+ ${reveal?(it.ans===p.c?`<div class="exp"><b>✔ Certo</b> — ${esc(p.e)}</div>`:
+ `<div class="exp" style="border-color:var(--ko)"><b class="ko-t">✘ ${it.ans==null?"Sem resposta":"Porque é que a tua resposta está errada"}</b>${it.ans==null?"":`<br><i>"${esc(p.o[it.ans])}"</i> — ${esc(whyWrong(p,it.ans))}`}</div>
+ <div class="exp" style="border-color:var(--ok)"><b class="ok-t">✔ Resposta certa:</b> ${esc(p.o[p.c])}<br>${esc(p.e)}</div>`)+
+ (S.pend[p.id]!=null?`<p class="mut small">🔁 Esta pergunta está na Revisão de erros: precisa de mais ${S.pend[p.id]} acerto(s) seguido(s) para sair.</p>`:""):""}`;
 }
 function renderExam(){
  const it=EX.qs[EX.i];const n=EX.qs.filter(q=>q.ans!=null).length;
@@ -145,7 +157,7 @@ function finishExam(timeout){
  const sem=EX.qs.filter(q=>q.ans==null).length;
  if(!timeout&&sem&&!confirm(`Tens ${sem} pergunta(s) sem resposta (contam como erro). Entregar?`))return;
  EX.done=true;clearInterval(timer);
- EX.qs.forEach(q=>record(q.p,q.ans===q.p.c));
+ EX.qs.forEach(q=>record(q.p,q.ans===q.p.c,q.ans));
  const err=EX.qs.filter(q=>q.ans!==q.p.c).length;
  S.exams.push({d:new Date().toISOString(),err});save();
  const ok=err<=3;
@@ -178,7 +190,26 @@ function renderTrain(){
  app.innerHTML=header()+`<div class="card"><div class="top"><span class="pill">${TR.title} · ${TR.i+1}/${TR.qs.length}</span><span class="pill">✔ ${TR.ok}</span></div>
  <div class="bar" style="margin:10px 0"><i style="width:${TR.i/TR.qs.length*100}%"></i></div>${qHtml(it,rev)}
  ${rev?`<div style="margin-top:10px;text-align:right"><button class="p" onclick="TR.i++;renderTrain()">Seguinte →</button></div>`:""}</div>`;
- if(!rev)app.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{it.ans=+b.dataset.oi;const ok=it.ans===it.p.c;if(ok)TR.ok++;record(it.p,ok);renderTrain()});
+ if(!rev)app.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{it.ans=+b.dataset.oi;const ok=it.ans===it.p.c;if(ok)TR.ok++;record(it.p,ok,it.ans);renderTrain()});
+}
+
+// ── Erros frequentes ──
+function topMiss(n){return Object.entries(S.miss).map(([id,m])=>[PERGUNTAS[id],m]).filter(([p])=>p).sort((a,b)=>b[1].n-a[1].n).slice(0,n)}
+function mistakes(){
+ const all=topMiss(1e9);
+ if(!all.length){app.innerHTML=header()+`<div class="card"><b>Ainda não tens erros registados.</b><p class="mut">Faz simulações e treinos; aqui vais ver as perguntas que mais falhas e a confusão que costumas fazer.</p></div>`;return}
+ const byT={};all.forEach(([p,m])=>byT[p.t]=(byT[p.t]||0)+m.n);
+ const temas=Object.entries(byT).sort((a,b)=>b[1]-a[1]);
+ app.innerHTML=header()+`<h2>Os teus erros mais frequentes</h2>
+ <div class="card"><b>Temas onde mais erras</b><table>${temas.map(([t,n])=>`<tr><td>${TEMAS[t]}</td><td>${n} erro(s)</td><td><button onclick="train('${t}')">Treinar</button></td></tr>`).join("")}</table>
+ <p class="mut small">Instrutor: começa pelo tema do topo. Erros repetidos no mesmo tema quase sempre são <b>uma regra mal percebida</b>, não azar.</p>
+ <button class="p" onclick="train(null,topMiss(15).map(x=>x[0]))">Treinar as 15 que mais falho</button></div>
+ ${all.slice(0,25).map(([p,m])=>{const oi=Object.entries(m.o).sort((a,b)=>b[1]-a[1])[0];const pend=S.pend[p.id];
+  return `<div class="card"><div class="top"><span class="pill">${TEMAS[p.t]}</span><span class="pill ko-t">falhada ${m.n}×</span></div>
+  <p><b>${esc(p.q)}</b></p>
+  ${oi?`<p class="ko-t small">A tua confusão mais comum: "${esc(p.o[oi[0]])}"${oi[1]>1?` (${oi[1]}×)`:""}</p><p class="small">${esc(whyWrong(p,+oi[0]))}</p>`:""}
+  <p class="small"><b class="ok-t">✔ ${esc(p.o[p.c])}</b> — ${esc(p.e)}</p>
+  <p class="mut small">${pend!=null?`🔁 Ainda em revisão (faltam ${pend} acerto(s) seguidos)`:"✅ Já dominada (acertaste 2 vezes seguidas)"}</p></div>`}).join("")}`;
 }
 
 // ── Plano de 3 semanas ──

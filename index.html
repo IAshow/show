@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Instrutor de Código</title>
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--tx:#1b1f24;--mut:#5f6b7a;--bd:#dde2e8;--pri:#1f5fbf;--ok:#1d8a4b;--okbg:#e5f5ec;--ko:#c0352b;--kobg:#fbe9e7;--warn:#b26b00}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12151a;--card:#1b2028;--tx:#e8ecf1;--mut:#9aa6b4;--bd:#2c3440;--pri:#6ea4ff;--ok:#4cc483;--okbg:#16301f;--ko:#ff7a6e;--kobg:#3a1b18;--warn:#f0b04a}}
+:root[data-theme="dark"]{--bg:#12151a;--card:#1b2028;--tx:#e8ecf1;--mut:#9aa6b4;--bd:#2c3440;--pri:#6ea4ff;--ok:#4cc483;--okbg:#16301f;--ko:#ff7a6e;--kobg:#3a1b18;--warn:#f0b04a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:760px;margin:0 auto;padding:16px}
+h1{font-size:1.5rem;margin:.2em 0}h2{font-size:1.2rem;margin:1.2em 0 .5em}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px;margin:12px 0}
+.mut{color:var(--mut)}.small{font-size:.875rem}
+nav{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--bd);background:var(--card);color:var(--tx);padding:10px 14px}
+button.p{background:var(--pri);border-color:var(--pri);color:#fff}
+button:disabled{opacity:.5;cursor:default}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.opt{display:block;width:100%;text-align:left;margin:8px 0;padding:12px 14px}
+.opt.sel{border-color:var(--pri);box-shadow:inset 0 0 0 1px var(--pri)}
+.opt.ok{background:var(--okbg);border-color:var(--ok)}
+.opt.ko{background:var(--kobg);border-color:var(--ko)}
+.exp{border-left:4px solid var(--pri);padding:8px 12px;margin-top:10px;background:color-mix(in srgb,var(--pri) 8%,transparent);border-radius:6px}
+.bar{height:8px;background:var(--bd);border-radius:4px;overflow:hidden}.bar>i{display:block;height:100%;background:var(--pri)}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.pill{display:inline-block;padding:2px 10px;border-radius:999px;border:1px solid var(--bd);font-size:.8rem}
+.big{font-size:2rem;font-weight:700}
+.sign{display:flex;justify-content:center;margin:8px 0}
+table{width:100%;border-collapse:collapse}td,th{padding:6px 4px;border-bottom:1px solid var(--bd);text-align:left;font-size:.9rem}
+.day{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--bd)}
+.day input{margin-top:5px;width:18px;height:18px}
+.ok-t{color:var(--ok)}.ko-t{color:var(--ko)}.warn-t{color:var(--warn)}
+.qnav{display:flex;flex-wrap:wrap;gap:4px;margin-top:10px}.qnav button{padding:4px 0;width:34px;font-size:.8rem}
+.qnav .ans{background:color-mix(in srgb,var(--pri) 20%,var(--card))}
+.qnav .cur{border-color:var(--pri);border-width:2px}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<script src="perguntas.js"></script>
+<script>
+// ─────────── Armazenamento (seguro) ───────────
+const KEY="instrutor-codigo-v1";
+function load(){try{return JSON.parse(localStorage.getItem(KEY))||{}}catch(e){return{}}}
+let S=Object.assign({stats:{},box:{},exams:[],plan:{},examDate:null},load());
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+if(!S.examDate){const d=new Date();d.setDate(d.getDate()+21);S.examDate=d.toISOString().slice(0,10);save()}
+
+const $=s=>document.querySelector(s);
+const app=$("#app");
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+PERGUNTAS.forEach((p,i)=>p.id=i);
+
+// ─────────── Sinais em SVG ───────────
+const SIG={
+ stop:`<svg viewBox="0 0 100 100" width="110"><polygon points="30,2 70,2 98,30 98,70 70,98 30,98 2,70 2,30" fill="#c8102e" stroke="#fff" stroke-width="4"/><text x="50" y="61" font-size="28" font-weight="700" fill="#fff" text-anchor="middle" font-family="Arial">STOP</text></svg>`,
+ cedencia:`<svg viewBox="0 0 100 90" width="110"><polygon points="4,4 96,4 50,86" fill="#fff" stroke="#c8102e" stroke-width="9" stroke-linejoin="round"/></svg>`,
+ prioridade:`<svg viewBox="0 0 100 100" width="100"><rect x="18" y="18" width="64" height="64" transform="rotate(45 50 50)" fill="#fff" stroke="#222" stroke-width="2"/><rect x="28" y="28" width="44" height="44" transform="rotate(45 50 50)" fill="#f2c400"/></svg>`,
+ proibido:`<svg viewBox="0 0 100 100" width="100"><circle cx="50" cy="50" r="44" fill="#fff" stroke="#c8102e" stroke-width="10"/></svg>`,
+ sentidoproibido:`<svg viewBox="0 0 100 100" width="100"><circle cx="50" cy="50" r="46" fill="#c8102e"/><rect x="18" y="42" width="64" height="16" fill="#fff"/></svg>`,
+ estacionamento:`<svg viewBox="0 0 100 100" width="100"><circle cx="50" cy="50" r="44" fill="#1f5fbf" stroke="#c8102e" stroke-width="10"/><line x1="22" y1="22" x2="78" y2="78" stroke="#c8102e" stroke-width="10"/></svg>`,
+ pararestacionar:`<svg viewBox="0 0 100 100" width="100"><circle cx="50" cy="50" r="44" fill="#1f5fbf" stroke="#c8102e" stroke-width="10"/><line x1="22" y1="22" x2="78" y2="78" stroke="#c8102e" stroke-width="10"/><line x1="78" y1="22" x2="22" y2="78" stroke="#c8102e" stroke-width="10"/></svg>`,
+ perigo:`<svg viewBox="0 0 100 90" width="110"><polygon points="50,4 96,86 4,86" fill="#fff" stroke="#c8102e" stroke-width="9" stroke-linejoin="round"/><text x="50" y="74" font-size="44" font-weight="700" fill="#222" text-anchor="middle" font-family="Arial">!</text></svg>`,
+ obrigacao:`<svg viewBox="0 0 100 100" width="100"><circle cx="50" cy="50" r="46" fill="#1f5fbf"/><path d="M24 50h40M52 34l16 16-16 16" stroke="#fff" stroke-width="9" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+};
+
+// ─────────── Estatísticas e repetição espaçada (caixas de Leitner) ───────────
+function record(p,ok){
+ const st=S.stats[p.t]||(S.stats[p.t]={a:0,c:0});st.a++;if(ok)st.c++;
+ const b=S.box[p.id]??0;S.box[p.id]=ok?Math.min(b+1,4):-1; // -1 = errada recentemente
+ save();
+}
+function weakQs(){return PERGUNTAS.filter(p=>S.box[p.id]===-1)}
+function pickExam(n=30){
+ // Distribui por todos os temas e privilegia as perguntas em que mais falhas
+ const byT={};PERGUNTAS.forEach(p=>(byT[p.t]=byT[p.t]||[]).push(p));
+ const out=[];const temas=shuffle(Object.keys(byT));
+ let k=0;while(out.length<n){const arr=byT[temas[k%temas.length]];const pool=arr.filter(p=>!out.includes(p));
+  if(pool.length){pool.sort((a,b)=>(S.box[a.id]??0)-(S.box[b.id]??0)+Math.random()*2-1);out.push(pool[0])}k++;
+  if(k>5000)break}
+ return shuffle(out);
+}
+function prep(qs){return qs.map(p=>{const order=shuffle(p.o.map((_,i)=>i));return{p,order,ans:null}})}
+
+// ─────────── Ecrãs ───────────
+function header(){
+ const dias=Math.ceil((new Date(S.examDate)-new Date(new Date().toISOString().slice(0,10)))/864e5);
+ return `<div class="top"><div><h1>🚗 Instrutor de Código</h1><div class="mut small">Exame teórico categoria B · 30 perguntas · 30 min · máximo 3 erros</div></div>
+ <span class="pill">${dias>=0?`Faltam <b>${dias}</b> dias`:"Data do exame passou"}</span></div>
+ <nav><button onclick="home()">Início</button><button onclick="startExam()">Simulação</button><button onclick="pickTheme()">Treino por tema</button><button onclick="reviewErr()">Revisão de erros (${weakQs().length})</button><button onclick="plan()">Plano 3 semanas</button><button onclick="tips()">Estratégia</button></nav>`;
+}
+function home(){
+ const tot=Object.values(S.stats).reduce((a,s)=>({a:a.a+s.a,c:a.c+s.c}),{a:0,c:0});
+ const last=S.exams.slice(-5);
+ const ready=last.length>=5&&last.every(e=>e.err<=2);
+ let rows=Object.entries(TEMAS).map(([k,n])=>{const s=S.stats[k];const pct=s?Math.round(100*s.c/s.a):null;
+  const cls=pct==null?"mut":pct>=90?"ok-t":pct>=75?"warn-t":"ko-t";
+  return `<tr><td>${n}</td><td class="${cls}">${pct==null?"—":pct+"%"}</td><td><button onclick="train('${k}')">Treinar</button></td></tr>`}).join("");
+ app.innerHTML=header()+`
+ <div class="grid">
+  <div class="card"><div class="mut small">Respostas certas (total)</div><div class="big">${tot.a?Math.round(100*tot.c/tot.a)+"%":"—"}</div><div class="mut small">${tot.c}/${tot.a} respondidas · banco com ${PERGUNTAS.length} perguntas</div></div>
+  <div class="card"><div class="mut small">Últimas simulações (erros)</div><div class="big">${last.length?last.map(e=>`<span class="${e.err<=3?"ok-t":"ko-t"}">${e.err}</span>`).join(" "):"—"}</div><div class="mut small">${ready?"<b class='ok-t'>Pronto! 5 seguidas com ≤2 erros.</b>":"Meta: 5 simulações seguidas com ≤ 2 erros"}</div></div>
+ </div>
+ <div class="card"><b>Data do exame:</b> <input type="date" value="${S.examDate}" onchange="S.examDate=this.value;save();home()">
+  <p class="mut small">Instrutor: "Não te contentes com 3 erros nos treinos. Se no simulador fazes 0–2 erros com regularidade, no dia do exame os nervos ainda te deixam margem."</p>
+  <button class="p" onclick="startExam()">Começar simulação de exame</button></div>
+ <h2>Domínio por tema</h2>
+ <div class="card"><table><tr><th>Tema</th><th>Acerto</th><th></th></tr>${rows}</table>
+ <p class="mut small">Verde ≥ 90% · Laranja 75–89% · Vermelho &lt; 75%. Treina primeiro os vermelhos.</p>
+ <button onclick="if(confirm('Apagar todo o progresso?')){S={stats:{},box:{},exams:[],plan:{},examDate:S.examDate};save();home()}">Repor progresso</button></div>`;
+}
+
+// ── Simulação de exame ──
+let EX=null,timer=null;
+function startExam(){
+ EX={qs:prep(pickExam(30)),i:0,end:Date.now()+30*60*1000,done:false};
+ clearInterval(timer);timer=setInterval(()=>{if(!EX||EX.done)return clearInterval(timer);
+  const t=$("#clock");const r=EX.end-Date.now();if(r<=0){finishExam(true)}else if(t){t.textContent=fmt(r)}},500);
+ renderExam();
+}
+const fmt=ms=>{const s=Math.max(0,Math.ceil(ms/1000));return `${String(s/60|0).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`};
+function qHtml(it,reveal){
+ const p=it.p;
+ return `${p.s?`<div class="sign">${SIG[p.s]||""}</div>`:""}<p><b>${esc(p.q)}</b></p>
+ ${it.order.map((oi,k)=>{let c="opt";if(it.ans===oi)c+=" sel";if(reveal){if(oi===p.c)c+=" ok";else if(it.ans===oi)c+=" ko"}
+  return `<button class="${c}" data-oi="${oi}" ${reveal?"disabled":""}>${"ABCD"[k]}. ${esc(p.o[oi])}</button>`}).join("")}
+ ${reveal?`<div class="exp"><b>${it.ans===p.c?"✔ Certo":"✘ Errado"}</b> — ${esc(p.e)}</div>`:""}`;
+}
+function renderExam(){
+ const it=EX.qs[EX.i];const n=EX.qs.filter(q=>q.ans!=null).length;
+ app.innerHTML=header()+`<div class="card"><div class="top"><span class="pill">Pergunta ${EX.i+1}/30 · ${TEMAS[it.p.t]}</span><span class="pill">⏱ <b id="clock">${fmt(EX.end-Date.now())}</b></span></div>
+ <div class="bar" style="margin:10px 0"><i style="width:${n/30*100}%"></i></div>${qHtml(it,false)}
+ <div class="top" style="margin-top:10px"><button onclick="EX.i=Math.max(0,EX.i-1);renderExam()" ${EX.i?"":"disabled"}>← Anterior</button>
+ ${EX.i<29?`<button class="p" onclick="EX.i++;renderExam()">Seguinte →</button>`:`<button class="p" onclick="finishExam()">Entregar exame</button>`}</div>
+ <div class="qnav">${EX.qs.map((q,k)=>`<button class="${q.ans!=null?"ans":""} ${k===EX.i?"cur":""}" onclick="EX.i=${k};renderExam()">${k+1}</button>`).join("")}</div>
+ <p class="mut small">Tal como no exame real, só vês a correção no fim. Podes voltar atrás e rever.</p></div>`;
+ app.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{it.ans=+b.dataset.oi;renderExam()});
+}
+function finishExam(timeout){
+ if(EX.done)return;
+ const sem=EX.qs.filter(q=>q.ans==null).length;
+ if(!timeout&&sem&&!confirm(`Tens ${sem} pergunta(s) sem resposta (contam como erro). Entregar?`))return;
+ EX.done=true;clearInterval(timer);
+ EX.qs.forEach(q=>record(q.p,q.ans===q.p.c));
+ const err=EX.qs.filter(q=>q.ans!==q.p.c).length;
+ S.exams.push({d:new Date().toISOString(),err});save();
+ const ok=err<=3;
+ const byT={};EX.qs.filter(q=>q.ans!==q.p.c).forEach(q=>byT[q.p.t]=(byT[q.p.t]||0)+1);
+ app.innerHTML=header()+`<div class="card" style="border-color:var(--${ok?"ok":"ko"})"><div class="big ${ok?"ok-t":"ko-t"}">${ok?"APROVADO":"REPROVADO"}</div>
+ <p>${30-err}/30 certas · <b>${err}</b> erro(s)${timeout?" · tempo esgotado":""}.</p>
+ <p class="mut">${err===0?"Perfeito. Mantém o ritmo e foca-te nas rasteiras.":err<=2?"Muito bom — esta é a zona segura.":err===3?"Passavas, mas à justa. No dia, os nervos custam 1–2 erros. Treina mais.":"Ainda não. Revê os temas abaixo e faz o 'Revisão de erros'."}</p>
+ ${Object.keys(byT).length?`<p><b>Onde falhaste:</b> ${Object.entries(byT).map(([t,c])=>`${TEMAS[t]} (${c})`).join(", ")}</p>`:""}
+ <button class="p" onclick="startExam()">Nova simulação</button> <button onclick="reviewErr()">Treinar os erros</button></div>
+ <h2>Correção</h2>${EX.qs.map((q,k)=>`<div class="card"><span class="pill">${k+1} · ${TEMAS[q.p.t]}</span>${qHtml(q,true)}</div>`).join("")}`;
+ scrollTo(0,0);
+}
+
+// ── Treino (feedback imediato) ──
+let TR=null;
+function pickTheme(){
+ app.innerHTML=header()+`<h2>Treino por tema</h2><p class="mut">Feedback imediato e explicação do instrutor em cada pergunta.</p><div class="grid">
+ ${Object.entries(TEMAS).map(([k,n])=>`<button class="opt" onclick="train('${k}')">${n} <span class="mut small">(${PERGUNTAS.filter(p=>p.t===k).length})</span></button>`).join("")}
+ <button class="opt" onclick="train('_rasteira')">⚠ Perguntas rasteiras <span class="mut small">(${PERGUNTAS.filter(p=>p.d===3).length})</span></button>
+ <button class="opt" onclick="train('_all')">Todas, por ordem aleatória</button></div>`;
+}
+function train(k,list){
+ const qs=list||(k==="_all"?PERGUNTAS:k==="_rasteira"?PERGUNTAS.filter(p=>p.d===3):PERGUNTAS.filter(p=>p.t===k));
+ TR={qs:prep(shuffle(qs)),i:0,ok:0,title:list?"Revisão de erros":k==="_all"?"Todas":k==="_rasteira"?"Rasteiras":TEMAS[k]};renderTrain();
+}
+function reviewErr(){const w=weakQs();if(!w.length){app.innerHTML=header()+`<div class="card"><b>Sem erros pendentes 🎉</b><p class="mut">As perguntas que falhares aparecem aqui até as acertares.</p><button class="p" onclick="startExam()">Fazer simulação</button></div>`;return}train(null,w)}
+function renderTrain(){
+ if(TR.i>=TR.qs.length){app.innerHTML=header()+`<div class="card"><div class="big">${TR.ok}/${TR.qs.length}</div><p>${TR.title} concluído.</p><button class="p" onclick="home()">Ver progresso</button> <button onclick="reviewErr()">Revisão de erros</button></div>`;return}
+ const it=TR.qs[TR.i];const rev=it.ans!=null;
+ app.innerHTML=header()+`<div class="card"><div class="top"><span class="pill">${TR.title} · ${TR.i+1}/${TR.qs.length}</span><span class="pill">✔ ${TR.ok}</span></div>
+ <div class="bar" style="margin:10px 0"><i style="width:${TR.i/TR.qs.length*100}%"></i></div>${qHtml(it,rev)}
+ ${rev?`<div style="margin-top:10px;text-align:right"><button class="p" onclick="TR.i++;renderTrain()">Seguinte →</button></div>`:""}</div>`;
+ if(!rev)app.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{it.ans=+b.dataset.oi;const ok=it.ans===it.p.c;if(ok)TR.ok++;record(it.p,ok);renderTrain()});
+}
+
+// ── Plano de 3 semanas ──
+const PLANO=[
+ ["Semana 1 — Fundamentos (aprender)",[
+  "Diagnóstico: faz 1 simulação SEM estudar. Anota os temas vermelhos.",
+  "Sinalização: formas e cores, hierarquia (agente > temporária > semáforos > verticais > marcas). Treino por tema.",
+  "Prioridades e rotundas: regra da direita, sair de parques, virar à esquerda. Treino por tema.",
+  "Velocidades: decora 50/90/100/120 e com reboque 50/70/80/100. Treino por tema.",
+  "Ultrapassagem e manobras + Paragem e estacionamento (5 m, 25 m/5 m). Treino por tema.",
+  "Álcool (0,5 / 0,2 / 0,8 / 1,2), fadiga, carta por pontos. Treino por tema.",
+  "Revisão: 'Revisão de erros' até ficar a zero + 1 simulação.",
+ ]],
+ ["Semana 2 — Consolidação (praticar)",[
+  "Segurança e distâncias (2 s, reação+travagem, ÷3,6). Condições adversas.",
+  "Iluminação e autoestradas. 1 simulação.",
+  "Peões, ciclistas, crianças (1,5 m, 135 cm, airbag). Documentos e veículo. 1 simulação.",
+  "Acidentes (P.A.S., 112, triângulo 30 m/100 m) + ecocondução. 1 simulação.",
+  "Treino 'Perguntas rasteiras' + 2 simulações.",
+  "2 simulações + revisão de erros. Ver no Início os temas abaixo de 90%.",
+  "Descanso ativo: só revisão de erros (20 min). Pede à escola o acesso ao simulador oficial de perguntas do IMT.",
+ ]],
+ ["Semana 3 — Modo exame (afinar)",[
+  "3 simulações cronometradas. Objetivo: ≤ 2 erros.",
+  "3 simulações + revisão de erros. Alternar com o simulador da escola de condução.",
+  "Treino nos 2 temas mais fracos + 2 simulações.",
+  "3 simulações. Se 5 seguidas com ≤ 2 erros: estás pronto.",
+  "Rasteiras + revisão de erros. 2 simulações.",
+  "Véspera: 1 simulação leve, rever 'Estratégia'. Dormir 8 h. Nada de maratonas.",
+  "DIA DO EXAME: chegar cedo, documento de identificação, ler cada pergunta até ao fim. Boa sorte!",
+ ]],
+];
+function plan(){
+ let n=0;app.innerHTML=header()+`<h2>Plano de 3 semanas</h2><p class="mut">~1h a 1h30 por dia. Marca o que fizeste — fica guardado neste navegador.</p>`+
+ PLANO.map(([t,ds])=>`<div class="card"><b>${t}</b>${ds.map(d=>{const id=n++;return `<label class="day"><input type="checkbox" ${S.plan[id]?"checked":""} onchange="S.plan[${id}]=this.checked;save()"><span><b>Dia ${id+1}.</b> ${d}</span></label>`}).join("")}</div>`).join("");
+}
+
+// ── Estratégia do instrutor ──
+function tips(){
+ app.innerHTML=header()+`<h2>Estratégia do instrutor</h2>
+ <div class="card"><b>Como é o exame</b><ul>
+ <li>30 perguntas de escolha múltipla (2 a 4 opções), em computador, no IMT ou num centro de exames autorizado.</li>
+ <li>30 minutos. Aprovação com <b>no máximo 3 erros</b> (27 certas). Pergunta em branco = erro.</li>
+ <li>As perguntas vêm de um banco oficial muito grande, com muitas imagens de situações reais. Este sistema treina as <b>regras</b> que estão por trás delas — usa também o simulador da tua escola.</li></ul></div>
+ <div class="card"><b>Táticas para não errar mais de 3</b><ol>
+ <li><b>Lê a pergunta até ao fim</b> e procura as palavras-armadilha: "sempre", "nunca", "apenas", "exceto", "pode", "deve".</li>
+ <li><b>Olha para a imagem inteira</b>: sinais ao fundo, marcas no chão, o agente, o tipo de veículo (ligeiro? com reboque?), dentro ou fora da localidade.</li>
+ <li><b>Hierarquia primeiro</b>: há agente? Sinal temporário? Semáforo? Só depois aplicas a regra geral.</li>
+ <li><b>Na dúvida, escolhe a resposta mais prudente e segura</b> — o Código privilegia sempre a segurança e os mais vulneráveis.</li>
+ <li><b>Não mudes à pressa</b>: a primeira intuição, depois de bem treinada, costuma estar certa. Muda só se encontrares um facto concreto.</li>
+ <li><b>Tempo</b>: 1 minuto por pergunta. Se bloqueares, avança e volta no fim (a maior parte dos simuladores permite rever).</li>
+ <li><b>Treina acima da fasquia</b>: o objetivo nos treinos é 0–2 erros, não 3.</li></ol></div>
+ <div class="card"><b>Números que tens de saber de cor</b><table>
+ <tr><td>Velocidades ligeiro</td><td>50 · 90 · 100 (via reservada) · 120</td></tr>
+ <tr><td>Com reboque</td><td>50 · 70 · 80 · 100</td></tr>
+ <tr><td>Zona de coexistência</td><td>20 km/h</td></tr>
+ <tr><td>Álcool</td><td>0,5 g/l geral · 0,2 g/l recém-encartado/profissional · 0,8 muito grave · 1,2 crime</td></tr>
+ <tr><td>Pontos</td><td>12 iniciais (máx. 15) · grave −2 · muito grave −4 · crime −6 · 4–5 pts formação · 1–3 pts prova teórica · 0 cassação</td></tr>
+ <tr><td>Regime probatório</td><td>3 anos · cancela com 1 muito grave, 2 graves ou 1 crime</td></tr>
+ <tr><td>Estacionamento</td><td>5 m de passadeiras e cruzamentos · 25 m antes / 5 m depois de paragem de autocarro</td></tr>
+ <tr><td>Triângulo</td><td>≥ 30 m do veículo, visível a ≥ 100 m</td></tr>
+ <tr><td>Ciclistas</td><td>1,5 m de distância lateral ao ultrapassar</td></tr>
+ <tr><td>Crianças</td><td>&lt; 12 anos e &lt; 135 cm → sistema de retenção</td></tr>
+ <tr><td>Pneus</td><td>1,6 mm mínimo</td></tr>
+ <tr><td>Distância</td><td>2 s (seco) · 4 s (molhado) · km/h ÷ 3,6 = m/s</td></tr>
+ <tr><td>Inspeção</td><td>4 anos, depois 2 em 2 até aos 8, depois anual</td></tr>
+ <tr><td>Emergência</td><td>112 · P.A.S. (Prevenir, Alertar, Socorrer)</td></tr></table></div>
+ <div class="card mut small">Aviso: este banco foi escrito com base no Código da Estrada para treino. As regras podem ser alteradas — confirma qualquer dúvida com o teu instrutor da escola de condução ou no site do IMT (imt-ip.pt).</div>`;
+}
+home();
+</script>
+</body>
+</html>

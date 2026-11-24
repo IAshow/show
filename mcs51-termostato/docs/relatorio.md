@@ -162,6 +162,19 @@ Os contactos mecânicos geram vários impulsos ao serem premidos (*bounce*, tipi
 
 Os LEDs são ligados em lógica negativa (cátodo no pino, ânodo a +5 V por 330 Ω): o 8051 consegue absorver muito mais corrente (I<sub>OL</sub>) do que fornecer com as *pull‑ups* fracas. Corrente em cada LED: (5 V − 2 V) / 330 Ω ≈ 9 mA.
 
+### 4.3 Tipos de interface usados
+
+Por regra do trabalho, não se usam componentes com interfaces de protocolos de sistemas embebidos (SPI/4‑wire, I²C/2‑wire, iButton/1‑wire). Todos os periféricos ligam‑se por linhas de dados, de endereço/controlo ou por E/S digital dos portos do MCS‑51:
+
+| Componente | Interface |
+|---|---|
+| LM35 | Analógica (tensão), lida através do ADC |
+| ADC0804 | Barramento de dados paralelo de 8 bits (P1) + linhas de controlo /RD, /WR, /INTR |
+| LCD LM016L (HD44780) | Barramento de dados paralelo de 8 bits (P2) + linhas de controlo RS, E |
+| L293D | Entrada digital (P3.7) |
+| Botões, LEDs, buzzer | E/S digital dos portos |
+| Virtual Terminal | UART integrada no próprio 8051 (SBUF/SCON/Timer 1), sem componente externo de protocolo |
+
 A lista completa de componentes e ligações para o PROTEUS está em `montagem-proteus.md`.
 
 ## 5. Software
@@ -300,7 +313,7 @@ Esta sequência confirma a leitura do ADC, o cálculo do *duty cycle*, a histere
 - **Tempo de execução das rotinas do LCD:** como R/W está a GND, os atrasos são fixos; ler a *busy flag* tornaria a escrita mais rápida.
 - **Resolução:** com 8 bits e 10 mV/LSB, a resolução é 1 °C. Um ADC de 10/12 bits ou VREF menor permitiria décimas de grau (à custa da gama).
 - **Filtragem:** pode fazer‑se a média de 4 ou 8 leituras para reduzir ruído real do sensor.
-- **Memória do setpoint:** guardar o SP numa EEPROM I²C (ex.: 24C02) para não se perder ao desligar.
+- **Memória do setpoint:** guardar o SP numa EEPROM paralela (ex.: 28C16) no barramento de memória externa (P0 multiplexado com latch 74LS373 + P2), para não se perder ao desligar. Isto obrigaria a mudar o LCD e o ADC para outros pinos ou a ligá‑los também ao barramento com descodificação de endereços.
 - **Aquecimento:** acrescentar um relé para uma resistência de aquecimento e transformar o sistema num controlador de dois sentidos.
 - **Controlo PI** em vez de proporcional, para eliminar o erro em regime permanente.
 
